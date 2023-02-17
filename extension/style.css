@@ -1,0 +1,8 @@
+img.channel-emoji {
+    width: 36px;
+    height: 36px;
+    margin: 2px 4px;
+    border-radius: 5px;
+    object-fit: cover;
+    vertical-align: middle;
+}

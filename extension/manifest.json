@@ -1,0 +1,19 @@
+{
+    "manifest_version": 3,
+    "name": "Facemoji",
+    "version": "0.1",
+    "description": "Add your face to ChannelTalk",
+    "content_scripts": [
+        {
+            "matches": [
+                "https://desk.channel.io/*"
+            ],
+            "js": [
+                "index.js"
+            ],
+            "css": [
+                "style.css"
+            ]
+        }
+    ]
+}
