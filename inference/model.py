@@ -132,4 +132,7 @@ def inference(
         x = 255.0 * rearrange(x, "1 c h w -> h w c")
         edited_image = Image.fromarray(x.type(torch.uint8).cpu().numpy())
 
-    return edited_image
+    image_thumbnail = edited_image.copy()
+    image_thumbnail.thumbnail((72, 72), Image.Resampling.LANCZOS)
+
+    return {"inside": edited_image, "cover": image_thumbnail}

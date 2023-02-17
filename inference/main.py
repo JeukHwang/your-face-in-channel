@@ -14,14 +14,14 @@ from queue import Queue
 from typing import List
 from PIL import Image
 
-from fastapi import FastAPI, UploadFile, File, Response
+from fastapi import FastAPI, File, Form
 from fastapi.responses import JSONResponse
 
 # from instruct_pix2pix.edit_app import generate
 from omegaconf import OmegaConf
 from model import load_model, inference
 from env import settings
-from generate import read_image
+from image import read_image
 from s3 import upload_file
 
 
@@ -42,10 +42,9 @@ def calculate_runtime() -> int:
 def inference_worker():
     while True:
         print("queue start")
-        image = waiting_queue.get()
-        print(image)
+        (image, name) = waiting_queue.get()
         start = time.time()
-        generate_emoji(image)
+        generate_emoji(image, name)
         end = time.time()
         runtime_record.append(end - start)
         waiting_queue.task_done()
@@ -85,79 +84,79 @@ async def root():
     return {"message": "lol"}
 
 
-def generate_emoji(image: Image):
+def generate_emoji(image: Image, name: str):
     if settings["MOCK"]:
         inference_results = [(image, "sample.png")]
         image_id = []
     else:
         # TODO - generate image with instruct pix2pix
         edits = [
-            "make him angry",
-            "make him clown",
+            {
+                "prompt": "make him angry",
+                "prefix": "angry",
+            },
+            {
+                "prompt": "make him clown",
+                "prefix": "clown",
+            },
         ]
         inference_results = [
-            (
-                inference(
-                    model,
-                    model_wrap,
-                    model_wrap_cfg,
-                    image,
-                    edit,
-                ),
-                str(uuid4()),
+            inference(
+                model,
+                model_wrap,
+                model_wrap_cfg,
+                image,
+                edit["prompt"],
             )
             for edit in edits
         ]
 
     image_paths = []
-    for (image, image_id) in inference_results:
-        image_path = os.path.join("images", f"{image_id}.png")
-        image.save(image_path)
+    for images in inference_results:
+        image_id = str(uuid4())
+
+        image_path = {
+            "inside": os.path.join("images", f"{image_id}_inside.png"),
+            "cover": os.path.join("images", f"{image_id}_cover.png"),
+        }
+        for image_type in ["inside", "cover"]:
+            images[image_type].save(image_path[image_type])
         image_paths.append(image_path)
-    # TODO - generate lot of images
 
-    url_list = []
-    for image_path in image_paths:
-        cover_url = upload_file(
-            aws_credentials={
-                "access_key_id": settings["IMAGE_STORAGE_ACCESS_KEY"],
-                "secret_access_key": settings["IMAGE_STORAGE_ACCESS_SECRET_KEY"],
-                "region_name": settings["IMAGE_STORAGE_REGION"],
-            },
-            file_name=image_path,
-            bucket=settings["IMAGE_STORAGE_BUCKET_NAME"],
-            object_name=os.path.join("thumb", "72x,cover,webp", image_id),
-        )
-        inside_url = upload_file(
-            aws_credentials={
-                "access_key_id": settings["IMAGE_STORAGE_ACCESS_KEY"],
-                "secret_access_key": settings["IMAGE_STORAGE_ACCESS_SECRET_KEY"],
-                "region_name": settings["IMAGE_STORAGE_REGION"],
-            },
-            file_name=image_path,
-            bucket=settings["IMAGE_STORAGE_BUCKET_NAME"],
-            object_name=os.path.join("thumb", "720x718,inside,webp", image_id),
-        )
+    items = []
+    for (image_path, edit) in zip(image_paths, edits):
+        # TODO - refactor
+        row = {}
+        for image_type, bucket_folder in zip(
+            ["inside", "cover"], ["720x718,inside,webp", "72x,cover,webp"]
+        ):
+            url = upload_file(
+                aws_credentials={
+                    "access_key_id": settings["IMAGE_STORAGE_ACCESS_KEY"],
+                    "secret_access_key": settings["IMAGE_STORAGE_ACCESS_SECRET_KEY"],
+                    "region_name": settings["IMAGE_STORAGE_REGION"],
+                },
+                file_name=image_path[image_type],
+                bucket=settings["IMAGE_STORAGE_BUCKET_NAME"],
+                object_name=os.path.join("thumb", bucket_folder, image_id),
+            )
+            row[image_type] = url
+            row["emoji_key"] = f"{edit['prefix']}_{name}"
 
-        url_list.append(
-            {
-                "cover": cover_url,
-                "inside": inside_url,
-            }
-        )
+        items.append(row)
 
     try:
         requests.post(
-            f'{settings["CONTROLLER_URL"]}/notification', data={"items": url_list}
+            f'{settings["CONTROLLER_URL"]}/notification', data={"items": items}
         )
     except Exception as e:
         print(e)  # TODO - log error
 
 
 @app.post("/generate")
-async def inferece(file: bytes = File(...)):
+async def inferece(file: bytes = File(...), name: str = Form()):
     image = read_image(file)
-    waiting_queue.put(image)
+    waiting_queue.put((image, name))
 
     return {
         "wait": waiting_queue.qsize(),
