@@ -6,3 +6,8 @@ export type GeneratedEmoji = {
 export type GeneratedEmojis = {
   items: [GeneratedEmoji]
 }
+
+export type GetEmoji = {
+  cover?: string
+  inside?: string
+}
