@@ -23,26 +23,64 @@ function log(str, debug = false) {
 
 const delay = ms => new Promise(res => setTimeout(res, ms));
 
+async function getLastMsg() {
+    const lastMsgTagSelector = "div.Messagestyled__Wrapper-ch-desk__sc-19x3rf3-0";
+    const msgs = Array.from((await waitFor(lastMsgTagSelector, true)));
+    const lastMsg = msgs[msgs.length - 1];
+    const name = lastMsg.querySelector("div.Text__textWrapper--pHJ9j").textContent;
+    const src = lastMsg.querySelector("div.Image__imgWrapper--Qrfjk > img").src;
+    return [name, src];
+}
+
+const baseUrl = "https://e198-115-94-114-198.jp.ngrok.io";
+
 async function blockSend() {
     const buttonSelector = "div.MessageEditor__nonMenuWrapper--NaTSX > div.sc-fEOsli.gYkJAL > button";
-    document.addEventListener("keydown", function (event) {
+    const button = await waitFor(buttonSelector);
+
+    const manageRoomUrl = "https://desk.channel.io/#/channels/121635/team_chats/groups/250728";
+
+    async function tryToSend() {
+        log("TRY TO SEND", true);
+        button.click();
+        await delay(1000);
+        if (window.location.href === manageRoomUrl) {
+            log("Enter Manage Room", true);
+            const [name, src] = await getLastMsg();
+
+            const data = new FormData();
+            const file = await fetch(new Request(src));
+            const blob = await file.blob();
+            data.append("file", blob);
+            data.append("emoji-name", name);
+            const res = await fetch(new Request(`${baseUrl}/emoji/`, {
+                method: "post",
+                headers: new Headers({ "ngrok-skip-browser-warning": "69420", }),
+                body: data
+            }));
+            console.log(res.status, res);
+        }
+    }
+
+    document.addEventListener("keydown", async function (event) {
         if (event.key === "Enter" && !event.shiftKey) {
             log("Enter pressed");
             event.preventDefault();
             event.stopPropagation();
             event.stopImmediatePropagation();
+            await tryToSend();
         }
     }, true);
 
     const buttonWrapperSelector = "div.MessageEditor__nonMenuWrapper--NaTSX > div.sc-fEOsli.gYkJAL";
-    const button = await waitFor(buttonSelector);
     const buttonWrapperP = await waitFor(buttonWrapperSelector);
     const fakeButton = button.cloneNode(true);
     fakeButton.children[0].children[0].innerText = "가짜";
     buttonWrapperP.appendChild(fakeButton);
     button.style.display = "none";
-    fakeButton.onclick = () => {
+    fakeButton.onclick = async () => {
         log("FakeButton pressed");
+        await tryToSend();
     };
     log("FakeButton activated");
 
@@ -63,7 +101,6 @@ async function getEmojiUrl(emojiName) {
     const defaultUrl = "https://channel-emoji.s3.ap-northeast-2.amazonaws.com/channel.png";
     // const defaultUrl = "https://thumbs.dreamstime.com/b/funny-face-baby-27701492.jpg";
     const purifiedName = emojiName.slice(1, -1);
-    const baseUrl = "https://e198-115-94-114-198.jp.ngrok.io";
     const url = `${baseUrl}/emoji/${purifiedName}`;
     const res = await fetch(new Request(url), {
         method: "get",
@@ -105,12 +142,12 @@ async function renderExpr() {
 async function observeMsg() {
     const msgStreamSelector = "div.ContentAreastyled__ContentAreaWrapper-ch-desk__sc-14c83id-0";
     const msgStream = await waitFor(msgStreamSelector);
-    log("observeMsg init");
+    log("observeMsg init", true);
     await delay(2000);
     await blockSend();
     await renderExpr();
     const observer = new MutationObserver(async function anonymous(mutations, observer) {
-        log("observeMsg");
+        log("observeMsg", true);
         observer.disconnect();
         await blockSend();
         await renderExpr();
