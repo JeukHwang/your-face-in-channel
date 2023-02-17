@@ -96,6 +96,7 @@ def main():
     parser.add_argument("--cfg-image", default=1.5, type=float)
     parser.add_argument("--seed", type=int)
     args = parser.parse_args()
+    torch.cuda.set_device(1)
 
     config = OmegaConf.load(args.config)
     model = load_model_from_config(config, args.ckpt, args.vae_ckpt)

@@ -3,7 +3,6 @@ import os
 import base64
 from uuid import uuid4
 import sys
-import json
 
 sys.path.append("./instruct_pix2pix/stable_diffusion")
 
@@ -16,20 +15,20 @@ from typing import List
 from PIL import Image
 
 from fastapi import FastAPI, File, Form
-from fastapi.responses import JSONResponse
 
 # from instruct_pix2pix.edit_app import generate
 from omegaconf import OmegaConf
 from model import load_model, inference
 from env import settings
-from image import read_image
+from image import read_image, crop_image
 from s3 import upload_file
+from autocrop import Cropper
 
 
 app = FastAPI()
 waiting_queue = Queue(-1)  # queue is infinite
 runtime_record: List[int] = []
-
+cropper = Cropper()
 
 def calculate_runtime() -> int:
     if len(runtime_record) == 0:
@@ -98,12 +97,16 @@ def generate_emoji(image: Image, name: str):
     else:
         edits = [
             {
-                "prompt": "make him angry",
+                "prompt": "make that person angry",
                 "prefix": "angry",
             },
             {
-                "prompt": "make him clown",
+                "prompt": "turn person into a clown",
                 "prefix": "clown",
+            },
+            {
+                "prompt": "turn person into a cyborg",
+                "prefix": "cyborg",
             },
         ]
         inference_results = [
@@ -163,6 +166,7 @@ def generate_emoji(image: Image, name: str):
 @app.post("/generate")
 async def inferece(file: bytes = File(...), name: str = Form()):
     image = read_image(file)
+    image = crop_image(cropper, image)
     waiting_queue.put((image, name))
 
     return {
