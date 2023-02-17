@@ -44,9 +44,9 @@ export class EmojiService {
         const { time, wait } = response.data
         await this.channelService.sendMessage(
           '250728',
-          `이모지를 생성중입니다😄\n대기 중인 이모지 :${wait}\n예상 소요 시간 : ${Math.round(
+          `이모지를 생성중입니다😄\n⏳대기 중인 이모지 :${wait}⏳\n⏱예상 소요 시간 : ${Math.round(
             time * wait
-          )}초`
+          )}초⏱`
         )
         return {
           time: time,
@@ -66,7 +66,7 @@ export class EmojiService {
       await this.storeEmojiUrl(cover, inside, emoji_key, names[1])
       await this.channelService.sendMessage(
         '250728',
-        `${emoji_key}완료되었습니다`
+        `🎉 이제 ${emoji_key}을 사용하실 수 있어요 🎉`
       )
     }
   }
