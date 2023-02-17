@@ -128,16 +128,23 @@ async function renderExpr(content) {
     log(`Start renderExpr`);
     content.forEach(async element => {
         const msg = element.innerHTML;
-        const exprs = msg.match(/;[A-Za-z-_]+;/g);
-        if (exprs !== null) {
-            const exprToUrl = await Promise.all(exprs.map(expr => getEmojiUrl(expr)));
-            const exprToTag = exprToUrl.map((expr) => `<img class="channel-emoji" src=${expr}>`);
-            log(`${exprs.join(" | ")} found in ${msg}`);
-            let innerHTML = msg;
-            for (let i = 0; i < exprs.length; i++) {
-                innerHTML = innerHTML.replace(exprs[i], exprToTag[i]);
+        const exactExpr = msg.match(/^;[A-Za-z-_]+;$/g);
+        if (exactExpr !== null) {
+            const url = await getEmojiUrl(msg);
+            log(`Exact match found in ${msg}`);
+            element.innerHTML = `<img class="big-channel-emoji" src=${url}>`;
+        } else {
+            const exprs = msg.match(/;[A-Za-z-_]+;/g);
+            if (exprs !== null) {
+                const exprToUrl = await Promise.all(exprs.map(expr => getEmojiUrl(expr)));
+                const exprToTag = exprToUrl.map((expr) => `<img class="channel-emoji" src=${expr}>`);
+                log(`${exprs.join(" | ")} found in ${msg}`);
+                let innerHTML = msg;
+                for (let i = 0; i < exprs.length; i++) {
+                    innerHTML = innerHTML.replace(exprs[i], exprToTag[i]);
+                }
+                element.innerHTML = innerHTML;
             }
-            element.innerHTML = innerHTML;
         }
     });
     log(`Finish renderExpr`);

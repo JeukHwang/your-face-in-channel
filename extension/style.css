@@ -6,3 +6,12 @@ img.channel-emoji {
     object-fit: cover;
     vertical-align: middle;
 }
+
+img.big-channel-emoji {
+    width: 180px;
+    height: 180px;
+    margin: 2px 4px;
+    border-radius: 10px;
+    object-fit: cover;
+    vertical-align: middle;
+}
