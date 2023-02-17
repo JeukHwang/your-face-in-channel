@@ -6,6 +6,14 @@ import sys
 
 sys.path.append("./instruct_pix2pix/stable_diffusion")
 
+import threading
+import requests
+import time
+from queue import Queue
+
+from typing import List
+from PIL import Image
+
 from fastapi import FastAPI, UploadFile, File, Response
 from fastapi.responses import JSONResponse
 
@@ -16,7 +24,34 @@ from env import settings
 from generate import read_image
 from s3 import upload_file
 
+
 app = FastAPI()
+waiting_queue = Queue(-1)  # queue is infinite
+runtime_record: List[int] = []
+
+def calculate_runtime() -> int:
+    if len(runtime_record) == 0:
+        wait_time = 10
+    else:
+        wait_time = sum(runtime_record) / len(runtime_record)
+
+    return wait_time
+
+def inference_worker():
+    while True:
+        print("queue start")
+        image = waiting_queue.get()
+        print(image)
+        start = time.time()
+        generate_emoji(image)
+        end = time.time()
+        runtime_record.append(end - start)
+        waiting_queue.task_done()
+        print("queue done, next item!")
+
+@app.on_event("startup")
+async def startup_event():
+    threading.Thread(target=inference_worker, daemon=True).start()
 
 
 def from_image_to_bytes(img):
@@ -47,15 +82,17 @@ async def root():
     return {"message": "lol"}
 
 
-@app.post("/generate")
-async def inferece(file: bytes = File(...)):
-    image = read_image(file)
-
+def generate_emoji(image: Image):
     if settings["MOCK"]:
         inference_result = image
         image_id = "sample.png"
     else:
         # TODO - generate image with instruct pix2pix
+        edits = [
+            "make him angry",
+            "make him sad",
+            "make him clown",
+        ]
         inference_result = inference(
             model, model_wrap, model_wrap_cfg, image, "make him angry"
         )
@@ -97,4 +134,20 @@ async def inferece(file: bytes = File(...)):
             }
         )
 
-    return {"items": url_list}
+    try:
+        requests.post(
+            f'{settings["CONTROLLER_URL"]}/notification', data={"items": url_list}
+        )
+    except Exception as e:
+        print(e)  # TODO - log error
+
+
+@app.post("/generate")
+async def inferece(file: bytes = File(...)):
+    image = read_image(file)
+    waiting_queue.put(image)
+
+    return {
+        "wait": waiting_queue.qsize(),
+        "time": calculate_runtime(),
+    }

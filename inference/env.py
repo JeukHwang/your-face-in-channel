@@ -13,6 +13,8 @@ class DotEnv(TypedDict):
     IMAGE_STORAGE_REGION: str
     IMAGE_STORAGE_BUCKET_NAME: str
 
+    CONTROLLER_URL: str
+
 
 settings: DotEnv = {
     "MOCK": False if os.getenv("MOCK") == "FALSE" else True,
@@ -20,4 +22,5 @@ settings: DotEnv = {
     "IMAGE_STORAGE_ACCESS_SECRET_KEY": os.getenv("IMAGE_STORAGE_ACCESS_SECRET_KEY"),
     "IMAGE_STORAGE_BUCKET_NAME": os.getenv("IMAGE_STORAGE_BUCKET_NAME"),
     "IMAGE_STORAGE_REGION": os.getenv("IMAGE_STORAGE_REGION"),
+    "CONTROLLER_URL": os.getenv("CONTROLLER_URL"),
 }
