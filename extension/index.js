@@ -24,7 +24,7 @@ async function main() {
     log("START");
     const buttonSelector = "div.MessageEditor__nonMenuWrapper--NaTSX > div.sc-fEOsli.gYkJAL > button";
     document.addEventListener("keydown", function (event) {
-        if (event.key === "Enter") {
+        if (event.key === "Enter" && !event.shiftKey) {
             log("Enter pressed");
             event.preventDefault();
             event.stopPropagation();
@@ -32,9 +32,8 @@ async function main() {
         }
     }, true);
 
-    await delay(1000);
+    await delay(2000);
     const buttonWrapperSelector = "div.MessageEditor__nonMenuWrapper--NaTSX > div.sc-fEOsli.gYkJAL";
-
     const button = await waitForElm(buttonSelector);
     const buttonWrapperP = await waitForElm(buttonWrapperSelector);
     const fakeButton = button.cloneNode(true);
