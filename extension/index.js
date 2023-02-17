@@ -28,7 +28,7 @@ async function getLastMsg() {
     const msgs = Array.from((await waitFor(lastMsgTagSelector, true)));
     const lastMsg = msgs[msgs.length - 1];
     const name = lastMsg.querySelector("div.Text__textWrapper--pHJ9j").textContent;
-    const src = lastMsg.querySelector("div.Image__imgWrapper--Qrfjk > img").src;
+    const src = lastMsg.querySelector("div.Image__imgWrapper--Qrfjk > img").src ?? null;
     return [name, src];
 }
 
@@ -42,29 +42,34 @@ async function blockSend() {
 
     async function tryToSend() {
         log("TRY TO SEND", true);
-        button.click();
+        const buttonSelector = "div.MessageEditor__nonMenuWrapper--NaTSX > div.sc-fEOsli.gYkJAL > button";
+        const button_ = await waitFor(buttonSelector);
+        button_.click();
         await delay(1000);
         if (window.location.href === manageRoomUrl) {
             log("Enter Manage Room", true);
             const [name, src] = await getLastMsg();
-
-            const data = new FormData();
-            const file = await fetch(new Request(src));
-            const blob = await file.blob();
-            data.append("file", blob);
-            data.append("emoji-name", name);
-            const res = await fetch(new Request(`${baseUrl}/emoji/`, {
-                method: "post",
-                headers: new Headers({ "ngrok-skip-browser-warning": "69420", }),
-                body: data
-            }));
-            console.log(res.status, res);
+            const isTriggered = name.match(/^\[[A-Za-z-_]+\]$/) !== null;
+            if (isTriggered && src !== null) {
+                const purifiedName = name.slice(1, -1);
+                const data = new FormData();
+                const file = await fetch(new Request(src));
+                const blob = await file.blob();
+                data.append("file", blob);
+                data.append("emoji-name", purifiedName);
+                const res = await fetch(new Request(`${baseUrl}/emoji/`, {
+                    method: "post",
+                    headers: new Headers({ "ngrok-skip-browser-warning": "69420", }),
+                    body: data
+                }));
+                console.log(res.status, res);
+            }
         }
     }
 
     document.addEventListener("keydown", async function (event) {
         if (event.key === "Enter" && !event.shiftKey) {
-            log("Enter pressed");
+            log("Enter pressed", true);
             event.preventDefault();
             event.stopPropagation();
             event.stopImmediatePropagation();
@@ -76,12 +81,12 @@ async function blockSend() {
     const buttonWrapperP = await waitFor(buttonWrapperSelector);
     const fakeButton = button.cloneNode(true);
     fakeButton.children[0].children[0].innerText = "가짜";
-    buttonWrapperP.appendChild(fakeButton);
-    button.style.display = "none";
     fakeButton.onclick = async () => {
-        log("FakeButton pressed");
+        log("FakeButton pressed", true);
         await tryToSend();
     };
+    buttonWrapperP.appendChild(fakeButton);
+    button.style.display = "none";
     log("FakeButton activated");
 
     const observer = new MutationObserver((mutations) => {
@@ -119,9 +124,8 @@ async function getEmojiUrl(emojiName) {
     return defaultUrl;
 }
 
-async function renderExpr() {
+async function renderExpr(content) {
     log(`Start renderExpr`);
-    const content = await getTextMsgs();
     content.forEach(async element => {
         const msg = element.innerHTML;
         const exprs = msg.match(/;[A-Za-z-_]+;/g);
@@ -139,19 +143,36 @@ async function renderExpr() {
     log(`Finish renderExpr`);
 }
 
+function debounce(func, timeout = 300) {
+    let timer;
+    return (...args) => {
+        clearTimeout(timer);
+        timer = setTimeout(() => {
+            func.apply(this, args);
+        }, timeout);
+    };
+}
+
 async function observeMsg() {
     const msgStreamSelector = "div.ContentAreastyled__ContentAreaWrapper-ch-desk__sc-14c83id-0";
     const msgStream = await waitFor(msgStreamSelector);
     log("observeMsg init", true);
     await delay(2000);
     await blockSend();
-    await renderExpr();
-    const observer = new MutationObserver(async function anonymous(mutations, observer) {
+    const content = await getTextMsgs();
+    await renderExpr(content);
+    const updateFunc = debounce(async (mutations, observer) => {
         log("observeMsg", true);
         observer.disconnect();
+        // console.log("MUT", Array.from(mutations[0].addedNodes));
         await blockSend();
-        await renderExpr();
+        // const content = Array.from(mutations[0].addedNodes);
+        const content = await getTextMsgs();
+        await renderExpr(content);
         observer.observe(msgStream, { childList: true, subtree: true });
+    });
+    const observer = new MutationObserver(async function anonymous(mutations, observer) {
+        await updateFunc(mutations, observer);
     });
     observer.observe(msgStream, { childList: true, subtree: true });
 }
