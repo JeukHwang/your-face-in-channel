@@ -15,8 +15,10 @@ function waitFor(selector, all = false) {
     });
 }
 
-function log(str) {
-    console.log(`FACEMOJI : ${str}`);
+function log(str, debug = false) {
+    if (debug) {
+        console.log(`FACEMOJI : ${str}`);
+    }
 }
 
 const delay = ms => new Promise(res => setTimeout(res, ms));
@@ -51,43 +53,41 @@ async function blockSend() {
     observer.observe(button, { attributeOldValue: true });
 }
 
-async function getContent() {
+async function getTextMsgs() {
     const textMsgTagSelector = "div.Text__textWrapper--pHJ9j > p.Text__text--vTgs0";
     const textMsgTags = await waitFor(textMsgTagSelector, true);
     return Array.from(textMsgTags);
 };
 
-function hasExpr(str) {
-    return str.match(/;[A-Za-z-]+;/g);
-}
-
 const emojiMap = (str) => "🔥"; // pseudo!!!
 
 async function renderExpr() {
-    log(`Render Update Start`);
-    const content = await getContent();
+    log(`Start renderExpr`);
+    const content = await getTextMsgs();
     content.forEach(element => {
         const msg = element.textContent;
-        if (hasExpr(msg) !== null) {
-            console.log(`Expr found in ${msg} ${hasExpr(msg)}`);
-            const textContent = hasExpr(msg).reduce(
-                (textContent_, expr) => textContent_.replace(expr, emojiMap(expr)), element.textContent
+        const expr = msg.match(/;[A-Za-z-]+;/g);
+        if (expr !== null) {
+            log(`${expr.join(" | ")} found in ${msg}`);
+            const textContent = expr.reduce(
+                (textContent_, expr) => textContent_.replace(expr, emojiMap(expr)),
+                element.textContent
             );
             element.textContent = textContent;
         }
     });
-    log(`Render Update Finish`);
+    log(`Finish renderExpr`);
 }
 
 async function observeMsg() {
     const msgStreamSelector = "div.ContentAreastyled__ContentAreaWrapper-ch-desk__sc-14c83id-0";
     const msgStream = await waitFor(msgStreamSelector);
-    log("MsgStream observe - init");
+    log("observeMsg init");
     await delay(2000);
     await blockSend();
     await renderExpr();
     const observer = new MutationObserver(async function anonymous(mutations, observer) {
-        log("MsgStream observe");
+        log("observeMsg");
         observer.disconnect();
         await blockSend();
         await renderExpr();
