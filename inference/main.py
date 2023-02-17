@@ -29,6 +29,7 @@ app = FastAPI()
 waiting_queue = Queue(-1)  # queue is infinite
 runtime_record: List[int] = []
 
+
 def calculate_runtime() -> int:
     if len(runtime_record) == 0:
         wait_time = 10
@@ -36,6 +37,7 @@ def calculate_runtime() -> int:
         wait_time = sum(runtime_record) / len(runtime_record)
 
     return wait_time
+
 
 def inference_worker():
     while True:
@@ -48,6 +50,7 @@ def inference_worker():
         runtime_record.append(end - start)
         waiting_queue.task_done()
         print("queue done, next item!")
+
 
 @app.on_event("startup")
 async def startup_event():
@@ -84,27 +87,36 @@ async def root():
 
 def generate_emoji(image: Image):
     if settings["MOCK"]:
-        inference_result = image
-        image_id = "sample.png"
+        inference_results = [(image, "sample.png")]
+        image_id = []
     else:
         # TODO - generate image with instruct pix2pix
         edits = [
             "make him angry",
-            "make him sad",
             "make him clown",
         ]
-        inference_result = inference(
-            model, model_wrap, model_wrap_cfg, image, "make him angry"
-        )
-        image_id = str(uuid4())
+        inference_results = [
+            (
+                inference(
+                    model,
+                    model_wrap,
+                    model_wrap_cfg,
+                    image,
+                    edit,
+                ),
+                str(uuid4()),
+            )
+            for edit in edits
+        ]
 
-    image_path = os.path.join("images", f"{image_id}.png")
-    inference_result.save(image_path)
-
+    image_paths = []
+    for (image, image_id) in inference_results:
+        image_path = os.path.join("images", f"{image_id}.png")
+        image.save(image_path)
+        image_paths.append(image_path)
     # TODO - generate lot of images
-    image_paths = [image_path]
-    url_list = []
 
+    url_list = []
     for image_path in image_paths:
         cover_url = upload_file(
             aws_credentials={
