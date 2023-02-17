@@ -20,9 +20,6 @@ export class Emoji {
   @Column({ unique: true, nullable: false })
   emoji_name: string
 
-  @Column({ nullable: true })
-  emoji_key: string
-
   @Column({ nullable: false })
   cover: string
 

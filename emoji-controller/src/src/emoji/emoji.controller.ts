@@ -24,12 +24,13 @@ export class EmojiController {
     @UploadedFile() file: Express.Multer.File,
     @Body('emoji-name') emojiName
   ) {
+    console.log(emojiName)
     return await this.emojiService.generateEmoji(file, emojiName)
   }
 
-  @Post('notification')
-  async notifyEmoji(@Body() body) {
-    return this.emojiService.notifyGeneratingEmoji(body)
+  @Post('/notification')
+  async notifyEmoji(@Body() requestBody) {
+    this.logger.verbose(requestBody)
   }
 
   @Get('')

@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common'
 import { channelAxios } from '../module/axios'
 import { GET_LIST_OF_MESSAGE, SEND_MESSAGE } from './api-values'
-import { generateFileBody, generateTextMessage } from './utils'
+import { generateFileBody } from './utils'
 
 @Injectable()
 export class ChannelapiService {
@@ -10,7 +10,7 @@ export class ChannelapiService {
     console.log(JSON.stringify(response.data.messages))
   }
 
-  async sendMessage(groupId: string, message?: string) {
+  async sendMessage(groupId: string) {
     const mockBody = {
       blocks: [
         {
@@ -21,7 +21,7 @@ export class ChannelapiService {
     }
     const response = await channelAxios.post(
       `${SEND_MESSAGE(groupId)}`,
-      generateTextMessage(message)
+      generateFileBody('hello', 'hello')
     )
     console.log(response.data.blocks)
   }

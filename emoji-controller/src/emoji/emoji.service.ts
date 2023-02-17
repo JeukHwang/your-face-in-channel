@@ -6,39 +6,77 @@ import { InjectRepository } from '@nestjs/typeorm'
 import { Emoji } from './entities/Emoji'
 import { Repository } from 'typeorm'
 import { GeneratedEmoji, GetEmoji } from './emoji.type'
-import { Blob } from 'buffer'
+import { ChannelapiService } from '../channelapi/channelapi.service'
+
 @Injectable()
 export class EmojiService {
   constructor(
     @InjectRepository(Emoji)
-    private readonly emojiRepository: Repository<Emoji>
+    private readonly emojiRepository: Repository<Emoji>,
+    private readonly channelService: ChannelapiService
   ) {}
   private logger = new Logger(EmojiService.name)
 
   async generateEmoji(imageFile: Express.Multer.File, emoji_name: string) {
-    const formData = new FormData()
+    const emoji = await this.emojiRepository.findOne({
+      where: {
+        emoji_key: emoji_name,
+      },
+    })
+    this.logger.verbose('File', imageFile)
+    if (emoji) {
+      await this.channelService.sendMessage(
+        '250728',
+        `${emoji_name} 은 이미 사용 중입니다`
+      )
+      return null
+    } else {
+      const formData = new FormData()
+      formData.append(
+        'file',
+        Buffer.from(imageFile.buffer),
+        imageFile.originalname
+      )
+      formData.append('name', emoji_name)
 
-    formData.append(
-      'file',
-      Buffer.from(imageFile.buffer),
-      imageFile.originalname
-    )
-    try {
-      const response = await emojiAxios.post('/generate', formData)
-      this.logger.verbose(response.data)
-      const { cover, inside }: GeneratedEmoji = response.data
-      // await this.storeEmojiUrl(cover, inside, emoji_name)
-      return 'good'
-    } catch (e) {
-      this.logger.error(e)
+      try {
+        const response = await emojiAxios.post('/generate', formData)
+        const { time, wait } = response.data
+        await this.channelService.sendMessage(
+          '250728',
+          `이모지를 생성중입니다😄\n예상 소요 시간 : ${Math.round(time * wait)}`
+        )
+        return {
+          time: time,
+          wait: wait,
+        }
+      } catch (e) {
+        this.logger.error('error', e)
+      }
+    }
+  }
+
+  async notifyGeneratingEmoji(body) {
+    const items = body.items
+    for (let i = 0; i < items.length; i++) {
+      const { cover, inside, emoji_key } = items[i]
+      const names = emoji_key.split('_')
+      await this.storeEmojiUrl(cover, inside, emoji_key, names[1])
+      await this.channelService.sendMessage(
+        '250728',
+        `${emoji_key}완료되었습니다`
+      )
     }
   }
 
   async getAllEmoji() {
     try {
       const emojis = await this.emojiRepository.find()
-      if (!emojis) {
-        return null
+      if (emojis.length === 0) {
+        return {
+          inside:
+            'https://channel-emoji.s3.ap-northeast-2.amazonaws.com/channel.png',
+        }
       }
       return emojis
     } catch (e) {
@@ -46,8 +84,14 @@ export class EmojiService {
     }
   }
 
-  async getEmoji(emoji_name: string): Promise<GetEmoji | null> {
+  async getEmoji(emoji_name: string): Promise<GetEmoji | string> {
     try {
+      if (emoji_name == 'channel-emoji') {
+        return {
+          inside:
+            'https://channel-emoji.s3.ap-northeast-2.amazonaws.com/channel.png',
+        }
+      }
       const emoji = await this.emojiRepository.findOne({
         where: {
           emoji_name: emoji_name,
@@ -68,13 +112,22 @@ export class EmojiService {
     }
   }
 
-  async storeEmojiUrl(cover: string, inside: string, emoji_name: string) {
-    const newEmoji = this.emojiRepository.create({
-      cover: cover,
-      inside: inside,
-      emoji_name: emoji_name,
-    })
-    const createdEmoji = await this.emojiRepository.save(newEmoji)
-    this.logger.verbose(`created ${createdEmoji}`)
+  async storeEmojiUrl(
+    cover: string,
+    inside: string,
+    emoji_name: string,
+    key: string
+  ) {
+    try {
+      const newEmoji = this.emojiRepository.create({
+        cover: cover,
+        inside: inside,
+        emoji_name: emoji_name,
+        emoji_key: key,
+      })
+      await this.emojiRepository.save(newEmoji)
+    } catch (e) {
+      this.logger.error(e)
+    }
   }
 }

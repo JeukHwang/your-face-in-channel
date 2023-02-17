@@ -15,14 +15,3 @@ export const generateFileBody = (filename: string, domain: string) => {
     ],
   }
 }
-
-export const generateTextMessage = (message: string) => {
-  return {
-    blocks: [
-      {
-        type: 'text',
-        value: message,
-      },
-    ],
-  }
-}
