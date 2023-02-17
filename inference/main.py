@@ -3,6 +3,7 @@ import os
 import base64
 from uuid import uuid4
 import sys
+import json
 
 sys.path.append("./instruct_pix2pix/stable_diffusion")
 
@@ -86,10 +87,15 @@ async def root():
 
 def generate_emoji(image: Image, name: str):
     if settings["MOCK"]:
-        inference_results = [(image, "sample.png")]
-        image_id = []
+        inference_results = [{
+            "inside": image,
+            "cover": image,
+        }]
+        edits = [{
+            "prompt": "mock message",
+            "prefix": "mock"
+        }]
     else:
-        # TODO - generate image with instruct pix2pix
         edits = [
             {
                 "prompt": "make him angry",
@@ -146,8 +152,9 @@ def generate_emoji(image: Image, name: str):
         items.append(row)
 
     try:
+        url = f'{settings["CONTROLLER_URL"]}/emoji/notification'
         requests.post(
-            f'{settings["CONTROLLER_URL"]}/notification', data={"items": items}
+            url, json={"items": items}
         )
     except Exception as e:
         print(e)  # TODO - log error
