@@ -23,7 +23,6 @@ export class EmojiService {
         emoji_key: emoji_name,
       },
     })
-    this.logger.verbose('File', imageFile)
     if (emoji) {
       await this.channelService.sendMessage(
         '250728',
@@ -44,7 +43,7 @@ export class EmojiService {
         const { time, wait } = response.data
         await this.channelService.sendMessage(
           '250728',
-          `이모지를 생성중입니다😄\n⏳대기 중인 이모지 :${wait}⏳\n⏱예상 소요 시간 : ${Math.round(
+          `이모지를 생성중입니다😄\n⏳대기 중인 이모지 : ${wait}개⏳\n⏱예상 소요 시간 : ${Math.round(
             time * wait
           )}초⏱`
         )
@@ -66,9 +65,14 @@ export class EmojiService {
       await this.storeEmojiUrl(cover, inside, emoji_key, names[1])
       await this.channelService.sendMessage(
         '250728',
-        `🎉 이제 ${emoji_key}을 사용하실 수 있어요 🎉`
+        `🎉 이제 ${emoji_key} 을 사용하실 수 있어요 🎉`
       )
     }
+
+    await this.channelService.sendMessage(
+      '250728',
+      `😍;{이모지이름}; 을 채팅창에 입력해보세요😍\n😎새로운 이모지를 만들고 싶으면 [{이모지이름}]을 채팅창에 입력한 후 사진을 첨부해주세요😎`
+    )
   }
 
   async getAllEmoji() {
